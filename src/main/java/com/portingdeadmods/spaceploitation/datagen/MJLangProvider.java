@@ -1,5 +1,7 @@
 package com.portingdeadmods.spaceploitation.datagen;
 
+import com.portingdeadmods.portingdeadlibs.api.config.PDLConfigHelper;
+import com.portingdeadmods.spaceploitation.MJConfig;
 import com.portingdeadmods.spaceploitation.Spaceploitation;
 import com.portingdeadmods.spaceploitation.registries.MJItems;
 import com.portingdeadmods.spaceploitation.registries.MJTranslations;
@@ -14,6 +16,8 @@ public class MJLangProvider extends LanguageProvider {
 
     @Override
     protected void addTranslations() {
+        PDLConfigHelper.generateConfigNames(MJConfig.class, Spaceploitation.MODID, this::add);
+
         add("itemGroup.spaceploitation", "Mod Jam");
         
         add("block.spaceploitation.tantalum_storage_block", "Block of Tantalum");

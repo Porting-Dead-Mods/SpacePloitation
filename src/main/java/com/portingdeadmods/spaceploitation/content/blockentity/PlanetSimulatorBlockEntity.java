@@ -1,5 +1,6 @@
 package com.portingdeadmods.spaceploitation.content.blockentity;
 
+import com.portingdeadmods.portingdeadlibs.utils.capabilities.HandlerUtils;
 import com.portingdeadmods.spaceploitation.Spaceploitation;
 import com.portingdeadmods.spaceploitation.capabilities.ReadOnlyEnergyStorage;
 import com.portingdeadmods.spaceploitation.capabilities.ReadOnlyFluidHandler;
@@ -7,6 +8,7 @@ import com.portingdeadmods.spaceploitation.capabilities.ReadOnlyItemHandler;
 import com.portingdeadmods.spaceploitation.capabilities.UpgradeItemHandler;
 import com.portingdeadmods.spaceploitation.content.block.UpgradeBlockEntity;
 import com.portingdeadmods.spaceploitation.utils.NumberFormatUtils;
+import guideme.internal.shaded.lucene.codecs.compressing.Compressor;
 import io.netty.buffer.Unpooled;
 import com.portingdeadmods.spaceploitation.content.items.UpgradeItem;
 import com.portingdeadmods.spaceploitation.content.blockentity.bus.AbstractBusBlockEntity;
@@ -59,6 +61,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.portingdeadmods.spaceploitation.content.blockentity.CompressorBlockEntity.UPGRADES_ID;
+
 public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements MultiblockEntity, MenuProvider, UpgradeBlockEntity {
     public static final Set<ResourceKey<UpgradeType>> SUPPORTED_UPGRADES = Set.of(
             ResourceKey.create(MJRegistries.UPGRADE_TYPE_KEY, Spaceploitation.rl("speed")),
@@ -66,7 +70,6 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
             ResourceKey.create(MJRegistries.UPGRADE_TYPE_KEY, Spaceploitation.rl("luck"))
     );
     private MultiblockData multiblockData;
-    private final UpgradeItemHandler upgradeItemHandler;
 
     private int progress = 0;
     private int maxProgress = 0;
@@ -160,14 +163,18 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
 
     public PlanetSimulatorBlockEntity(BlockPos blockPos, BlockState blockState) {
         super(MJBlockEntities.PLANET_SIMULATOR.get(), blockPos, blockState);
-        this.addItemHandler(1, (slot, item) -> item.has(MJDataComponents.PLANET));
+        this.addItemHandler(HandlerUtils::newItemStackHandler, builder -> builder
+                .slots(1)
+                .slotLimit($ -> 1)
+                .onChange($ -> this.updateData())
+                .validator((slot, item) -> item.has(MJDataComponents.PLANET)));
 
-        this.upgradeItemHandler = new UpgradeItemHandler(SUPPORTED_UPGRADES) {
+        addHandler(UPGRADES_ID, new UpgradeItemHandler(SUPPORTED_UPGRADES) {
             @Override
             protected void onContentsChanged(int slot) {
                 super.onContentsChanged(slot);
 
-                update();
+                updateData();
             }
 
             @Override
@@ -183,14 +190,12 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
 
                 PlanetSimulatorBlockEntity.this.onUpgradeRemoved(upgrade);
             }
-        };
+        });
 
     }
 
     @Override
-    public void commonTick() {
-        super.commonTick();
-
+    public void tick() {
         if (this.level.getGameTime() % 20 == 0 && !this.getBlockState().getValue(Multiblock.FORMED)) {
             MJMultiblocks.PLANET_SIMULATOR.get().form(this.level, this.worldPosition);
         }
@@ -200,7 +205,6 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
         }
         
     }
-    
     
     public String getDisplayText() {
         StringBuilder info = new StringBuilder();
@@ -249,7 +253,7 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
 
     private void processRecipes() {
         if (this.level == null || this.level.isClientSide) return;
-        this.update();
+        this.updateData();
 
         ItemStack planetCard = this.getItemHandler().getStackInSlot(0);
         if (planetCard.isEmpty() || !planetCard.has(MJDataComponents.PLANET)) {
@@ -1054,7 +1058,7 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
 
     @Override
     public UpgradeItemHandler getUpgradeItemHandler() {
-        return upgradeItemHandler;
+        return this.getHandler(UPGRADES_ID);
     }
 
     @Override
@@ -1098,8 +1102,8 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
     }
 
     @Override
-    public <T> Map<Direction, Pair<IOAction, int[]>> getSidedInteractions(BlockCapability<T, @Nullable Direction> blockCapability) {
-        return Map.of();
+    public IItemHandler getItemHandlerOnSide(Direction direction) {
+        return null;
     }
 
     @Override
@@ -1118,9 +1122,6 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
         if (this.getMultiblockData() != null) {
             tag.put("multiblock_data", this.saveMBData());
         }
-
-        CompoundTag compoundTag = this.upgradeItemHandler.serializeNBT(registries);
-        tag.put("upgrades", compoundTag);
 
         tag.putInt("progress", progress);
         tag.putInt("maxProgress", maxProgress);
@@ -1170,10 +1171,6 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
     protected void loadData(CompoundTag tag, HolderLookup.Provider registries) {
         if (tag.contains("multiblock_data")) {
             this.multiblockData = this.loadMBData(tag.getCompound("multiblock_data"));
-        }
-
-        if (tag.contains("upgrades")) {
-            this.upgradeItemHandler.deserializeNBT(registries, tag.getCompound("upgrades"));
         }
 
         progress = tag.getInt("progress");

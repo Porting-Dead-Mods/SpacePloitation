@@ -1,6 +1,8 @@
 package com.portingdeadmods.spaceploitation;
 
 import com.mojang.logging.LogUtils;
+import com.portingdeadmods.portingdeadlibs.api.config.PDLConfig;
+import com.portingdeadmods.portingdeadlibs.api.config.PDLConfigHelper;
 import com.portingdeadmods.spaceploitation.compat.guideme.GuideMECompat;
 import com.portingdeadmods.spaceploitation.content.blockentity.PlanetSimulatorBlockEntity;
 import com.portingdeadmods.spaceploitation.networking.MJNetworking;
@@ -39,7 +41,7 @@ public final class Spaceploitation {
         modEventBus.addListener(this::registerCapabilities);
         modEventBus.addListener(MJRegistries::registerDatapackRegistries);
 
-        modContainer.registerConfig(ModConfig.Type.COMMON, MJConfig.SPEC);
+        PDLConfigHelper.registerConfig(MJConfig.class, ModConfig.Type.COMMON).register(modContainer);
 
         if (ModList.get().isLoaded("guideme")) {
             initGuideMECompat();

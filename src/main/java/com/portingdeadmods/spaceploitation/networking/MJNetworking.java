@@ -55,10 +55,6 @@ public final class MJNetworking {
                 stack.set(MJDataComponents.PLANET, new PlanetComponent(Optional.of(planetType), false, planetType.isBlackHole()));
                 MJPlanetCards.addStack(stack);
             });
-            
-            if (Minecraft.getInstance().player != null) {
-                PortingDeadLibsClient.markTabsDirty();
-            }
         });
     }
 

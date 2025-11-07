@@ -1,5 +1,6 @@
 package com.portingdeadmods.spaceploitation.content.blockentity;
 
+import com.portingdeadmods.portingdeadlibs.utils.capabilities.HandlerUtils;
 import com.portingdeadmods.spaceploitation.MJConfig;
 import com.portingdeadmods.spaceploitation.Spaceploitation;
 import com.portingdeadmods.spaceploitation.capabilities.UpgradeItemHandler;
@@ -21,6 +22,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.MenuProvider;
@@ -32,6 +34,8 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.BlockCapability;
+import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.items.IItemHandlerModifiable;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -45,7 +49,7 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
             ResourceKey.create(MJRegistries.UPGRADE_TYPE_KEY, Spaceploitation.rl("energy")),
             ResourceKey.create(MJRegistries.UPGRADE_TYPE_KEY, Spaceploitation.rl("speed"))
     );
-    private final UpgradeItemHandler upgradeItemHandler;
+    public static final ResourceLocation UPGRADES_ID = Spaceploitation.rl("upgrades");
     private CompressingRecipe currentRecipe;
     private int progress;
     private int maxProgress;
@@ -56,17 +60,19 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
 
     public CompressorBlockEntity(BlockPos blockPos, BlockState blockState) {
         super(MJBlockEntities.COMPRESSOR.get(), blockPos, blockState);
-        addItemHandler(2, (slot, stack) -> slot == 0);
-        addEnergyStorage(MJConfig.COMPRESSOR_CAPACITY.getAsInt());
-
-        this.redstoneSignalType = RedstoneSignalType.IGNORED;
-        this.animationOffset = (blockPos.getX() + blockPos.getY() * 7 + blockPos.getZ() * 13) & 0x7F;
-
-        this.upgradeItemHandler = new UpgradeItemHandler(SUPPORTED_UPGRADES) {
+        addItemHandler(HandlerUtils::newItemStackHandler, builder -> builder
+                .onChange(this::onItemsChanged)
+                .slots(2)
+                .validator((slot, stack) -> slot == 0));
+        addEnergyStorage(HandlerUtils::newEnergystorage, builder -> builder
+                .maxTransfer(32)
+                .onChange(this::updateData)
+                .capacity(MJConfig.compressorEnergyCapacity));
+        addHandler(UPGRADES_ID, new UpgradeItemHandler(SUPPORTED_UPGRADES) {
             @Override
             protected void onContentsChanged(int slot) {
                 super.onContentsChanged(slot);
-                update();
+                updateData();
                 applyUpgrades();
             }
 
@@ -81,16 +87,20 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
                 super.onUpgradeRemoved(upgrade);
                 CompressorBlockEntity.this.onUpgradeRemoved(upgrade);
             }
-        };
+        });
+
+        this.redstoneSignalType = RedstoneSignalType.IGNORED;
+        this.animationOffset = (blockPos.getX() + blockPos.getY() * 7 + blockPos.getZ() * 13) & 0x7F;
+
     }
+
     
     public long getAnimationOffset() {
         return animationOffset;
     }
 
-    @Override
     protected void onItemsChanged(int slot) {
-        super.onItemsChanged(slot);
+        this.updateData();
 
         if (slot == 0 || slot == 1) {
             this.checkRecipe();
@@ -121,12 +131,12 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
     private void applyUpgrades() {
         if (currentRecipe == null) {
             this.maxProgress = 0;
-            this.energyUsage = MJConfig.COMPRESSOR_USAGE.getAsInt();
+            this.energyUsage = MJConfig.compressorEnergyUsage;
             return;
         }
 
         float duration = currentRecipe.duration();
-        float energyUsage = MJConfig.COMPRESSOR_USAGE.getAsInt();
+        float energyUsage = MJConfig.compressorEnergyUsage;
 
         for (ResourceKey<UpgradeType> upgradeTypeKey : SUPPORTED_UPGRADES) {
             int count = getUpgradeAmount(upgradeTypeKey);
@@ -151,7 +161,7 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
     }
 
     @Override
-    public void commonTick() {
+    public void tick() {
         if (this.currentRecipe != null && this.getEnergyStorage().getEnergyStored() >= energyUsage) {
             long currentTick = this.level.getGameTime();
             long tickInCycle = (currentTick + animationOffset) % 80;
@@ -165,7 +175,7 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
                 this.getEnergyStorage().extractEnergy(energyUsage, false);
                 ItemStack result = this.currentRecipe.result().copy();
                 this.getItemHandler().extractItem(0, 1, false);
-                this.forceInsertItem(1, result, false);
+                this.forceInsertItem(((IItemHandlerModifiable) this.getItemHandler()), 1, result, false, this::onItemsChanged);
                 this.progress = 0;
                 if (this.getBlockState().getValue(PDLBlockStateProperties.ACTIVE)) {
                     this.level.setBlockAndUpdate(this.worldPosition, this.getBlockState().setValue(PDLBlockStateProperties.ACTIVE, false));
@@ -193,11 +203,6 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
     }
 
     @Override
-    public <T> Map<Direction, Pair<IOAction, int[]>> getSidedInteractions(BlockCapability<T, @Nullable Direction> blockCapability) {
-        return Map.of();
-    }
-
-    @Override
     public @NotNull Component getDisplayName() {
         return Component.translatable("container.spaceploitation.compressor");
     }
@@ -214,10 +219,7 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
         this.maxProgress = tag.getInt("maxProgress");
         this.energyUsage = tag.getInt("energyUsage");
         this.redstoneSignalType = RedstoneSignalType.values()[tag.getInt("redstone_signal_type")];
-        
-        if (tag.contains("upgrades")) {
-            this.upgradeItemHandler.deserializeNBT(provider, tag.getCompound("upgrades"));
-        }
+
     }
 
     @Override
@@ -227,9 +229,7 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
         tag.putInt("maxProgress", this.maxProgress);
         tag.putInt("energyUsage", this.energyUsage);
         tag.putInt("redstone_signal_type", this.redstoneSignalType.ordinal());
-        
-        CompoundTag compoundTag = this.upgradeItemHandler.serializeNBT(provider);
-        tag.put("upgrades", compoundTag);
+
     }
 
     @Override
@@ -240,6 +240,11 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
     }
 
     @Override
+    public IEnergyStorage getEnergyStorage() {
+        return super.getEnergyStorage();
+    }
+
+    @Override
     public int emitRedstoneLevel() {
         return ItemHandlerHelper.calcRedstoneFromInventory(this.getItemHandler());
     }
@@ -247,7 +252,7 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
     @Override
     public void setRedstoneSignalType(RedstoneSignalType redstoneSignalType) {
         this.redstoneSignalType = redstoneSignalType;
-        this.update();
+        this.updateData();
     }
 
     @Override
@@ -257,7 +262,7 @@ public class CompressorBlockEntity extends ContainerBlockEntity implements MenuP
 
     @Override
     public UpgradeItemHandler getUpgradeItemHandler() {
-        return upgradeItemHandler;
+        return this.getHandler(UPGRADES_ID);
     }
 
     @Override
