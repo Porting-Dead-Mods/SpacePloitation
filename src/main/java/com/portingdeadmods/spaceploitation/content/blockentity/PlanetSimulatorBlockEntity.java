@@ -1,6 +1,7 @@
 package com.portingdeadmods.spaceploitation.content.blockentity;
 
 import com.portingdeadmods.portingdeadlibs.utils.capabilities.HandlerUtils;
+import com.portingdeadmods.spaceploitation.MJConfig;
 import com.portingdeadmods.spaceploitation.Spaceploitation;
 import com.portingdeadmods.spaceploitation.capabilities.ReadOnlyEnergyStorage;
 import com.portingdeadmods.spaceploitation.capabilities.ReadOnlyFluidHandler;
@@ -43,6 +44,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -51,6 +54,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -202,8 +207,57 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
 
         if (this.getBlockState().getValue(Multiblock.FORMED)) {
             processRecipes();
+
+            if (!this.level.isClientSide && hasBlackHoleCard()) {
+                processBlackHoleEffects();
+            }
         }
-        
+    }
+
+    private void processBlackHoleEffects() {
+        Vec3 center = getBlackHoleCenter();
+        double radius = MJConfig.blackHoleEffectRadius;
+        double gravityStrength = MJConfig.blackHoleGravityStrength;
+        float baseDamage = MJConfig.blackHoleDamagePerTick;
+
+        AABB effectArea = new AABB(
+                center.x - radius, center.y - radius, center.z - radius,
+                center.x + radius, center.y + radius, center.z + radius
+        );
+
+        List<Entity> entities = this.level.getEntities(null, effectArea);
+
+        for (Entity entity : entities) {
+            if (entity instanceof Player player && player.isSpectator()) {
+                continue;
+            }
+
+            Vec3 entityPos = entity.position().add(0, entity.getBbHeight() / 2, 0);
+            double distance = entityPos.distanceTo(center);
+
+            if (distance > radius || distance < 0.1) {
+                continue;
+            }
+
+            double normalizedDistance = distance / radius;
+            double strengthMultiplier = Math.pow(1 - normalizedDistance, 2);
+
+            Vec3 direction = center.subtract(entityPos).normalize();
+            Vec3 pullForce = direction.scale(gravityStrength * strengthMultiplier);
+            entity.setDeltaMovement(entity.getDeltaMovement().add(pullForce));
+            entity.hurtMarked = true;
+
+            if (entity instanceof LivingEntity livingEntity) {
+                if (entity instanceof Player player && player.isCreative()) {
+                    continue;
+                }
+
+                float damage = (float) (baseDamage * strengthMultiplier);
+                if (damage > 0.1f) {
+                    livingEntity.hurt(this.level.damageSources().magic(), damage);
+                }
+            }
+        }
     }
     
     public String getDisplayText() {
@@ -1115,6 +1169,34 @@ public class PlanetSimulatorBlockEntity extends ContainerBlockEntity implements 
     public void setMultiblockData(MultiblockData multiblockData) {
         this.multiblockData = multiblockData;
         this.setChanged();
+    }
+
+    public Vec3 getBlackHoleCenter() {
+        if (this.multiblockData == null) {
+            return Vec3.atCenterOf(this.worldPosition);
+        }
+
+        HorizontalDirection direction = this.multiblockData.direction();
+        if (direction == null) {
+            return Vec3.atCenterOf(this.worldPosition);
+        }
+
+        Vec3i relativeControllerPos = MultiblockHelper.getRelativeControllerPos(MJMultiblocks.PLANET_SIMULATOR.get());
+        BlockPos firstBlockPos = MultiblockHelper.getFirstBlockPos(direction, this.worldPosition, relativeControllerPos);
+
+        Vec3i centerOffset = new Vec3i(3, 3, 3);
+        BlockPos centerPos = MultiblockHelper.getCurPos(firstBlockPos, centerOffset, direction);
+
+        return Vec3.atCenterOf(centerPos);
+    }
+
+    public boolean hasBlackHoleCard() {
+        ItemStack card = this.getItemHandler().getStackInSlot(0);
+        if (card.isEmpty() || !card.has(MJDataComponents.PLANET)) {
+            return false;
+        }
+        PlanetComponent component = card.get(MJDataComponents.PLANET);
+        return component != null && component.isBlackHole();
     }
 
     @Override
