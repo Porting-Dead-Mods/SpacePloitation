@@ -13,7 +13,7 @@ in vec3 rayOrigin;
 in vec2 texCoord;
 
 uniform sampler2D DiffuseSampler;
-uniform sampler2D DiffuseDepthSampler;
+uniform sampler2D DepthSampler;
 
 out vec4 fragColor;
 
@@ -190,6 +190,13 @@ bool raySphere(vec3 ro, vec3 rd, vec3 center, float radius, out float t, out vec
 
 
 uniform vec3 BlackHolePosition;
+uniform float Near;
+uniform float Far;
+
+float linearizeDepth(float depth, float near, float far) {
+    float ndc = depth * 2.0 - 1.0;
+    return (2.0 * near * far) / (far + near - ndc * (far - near));
+}
 
 void main(  )
 {
@@ -203,6 +210,11 @@ void main(  )
     // ray = normalize(vec3(0, -1, 0));
     vec3 pos = rayOrigin - BlackHolePosition;
     vec3 baseScene = texture(DiffuseSampler, texCoord).rgb;
+
+    // Sample scene depth for occlusion
+    float sceneDepthRaw = texture(DepthSampler, texCoord).r;
+    float sceneDepth = linearizeDepth(sceneDepthRaw, Near, Far);
+    float blackHoleDist = length(BlackHolePosition - rayOrigin);
 
     vec4 col = vec4(0.);
     vec4 glow = vec4(0.);
@@ -314,6 +326,11 @@ void main(  )
     col = outCol;
    // col.rgb =  pow( col.rgb, vec3(0.6) );
 
-    fragColor = col;
+    // Per-pixel depth occlusion - hide black hole behind geometry
+    if (sceneDepth < blackHoleDist) {
+        fragColor = vec4(baseScene, 1.0);
+    } else {
+        fragColor = col;
+    }
 
 }
