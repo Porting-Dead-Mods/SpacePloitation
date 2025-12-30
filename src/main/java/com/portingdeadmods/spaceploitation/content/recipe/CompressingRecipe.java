@@ -3,8 +3,8 @@ package com.portingdeadmods.spaceploitation.content.recipe;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import com.portingdeadmods.spaceploitation.Spaceploitation;
 import com.portingdeadmods.portingdeadlibs.api.recipes.IngredientWithCount;
+import com.portingdeadmods.spaceploitation.registries.MJRecipes;
 import com.portingdeadmods.portingdeadlibs.api.recipes.PDLRecipe;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -18,7 +18,7 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 
 public record CompressingRecipe(IngredientWithCount ingredient, int duration, ItemStack result) implements PDLRecipe<SingleRecipeInput> {
-    public static final RecipeType<CompressingRecipe> TYPE = RecipeType.simple(Spaceploitation.rl("compressing"));
+    public static final RecipeType<CompressingRecipe> TYPE = MJRecipes.COMPRESSING_TYPE;
 
     @Override
     public boolean matches(SingleRecipeInput singleRecipeInput, Level level) {

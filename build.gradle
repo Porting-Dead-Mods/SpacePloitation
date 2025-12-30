@@ -112,7 +112,8 @@ dependencies {
     implementation "curse.maven:fusion-connected-textures-854949:7058347"
     implementation "curse.maven:jade-324717:6853386"
     runtimeOnly "curse.maven:mekanism-268560:7017663"
-    implementation "curse.maven:guideme-1173950:6812025"
+    implementation "curse.maven:guideme-1173950:7127444"
+    runtimeOnly "curse.maven:applied-energistics-2-223794:7027323"
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

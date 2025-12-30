@@ -3,8 +3,8 @@ package com.portingdeadmods.spaceploitation.content.recipe;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import com.portingdeadmods.spaceploitation.Spaceploitation;
 import com.portingdeadmods.spaceploitation.data.PlanetType;
+import com.portingdeadmods.spaceploitation.registries.MJRecipes;
 import com.portingdeadmods.spaceploitation.registries.MJRegistries;
 import com.portingdeadmods.portingdeadlibs.api.recipes.IngredientWithCount;
 import com.portingdeadmods.portingdeadlibs.api.recipes.PDLRecipe;
@@ -32,7 +32,7 @@ public record PlanetPowerRecipe(
         int energyPerTick,
         int duration
 ) implements PDLRecipe<SingleRecipeInput> {
-    public static final RecipeType<PlanetPowerRecipe> TYPE = RecipeType.simple(Spaceploitation.rl("planet_power"));
+    public static final RecipeType<PlanetPowerRecipe> TYPE = MJRecipes.PLANET_POWER_TYPE;
 
     @Override
     public boolean matches(SingleRecipeInput input, Level level) {

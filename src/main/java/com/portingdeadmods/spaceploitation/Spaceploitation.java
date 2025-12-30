@@ -34,6 +34,7 @@ public final class Spaceploitation {
         MJDataComponents.DATA_COMPONENTS.register(modEventBus);
         MJDataAttachments.ATTACHMENTS.register(modEventBus);
         MJRecipes.RECIPE_SERIALIZERS.register(modEventBus);
+        MJRecipes.RECIPE_TYPES.register(modEventBus);
         MJMultiblocks.MULTIBLOCKS.register(modEventBus);
         MJTranslations.TRANSLATIONS.register(modEventBus);
 
