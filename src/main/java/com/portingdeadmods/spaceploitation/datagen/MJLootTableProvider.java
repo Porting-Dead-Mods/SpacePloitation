@@ -12,10 +12,13 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.entries.LootItem;
 import net.minecraft.world.level.storage.loot.functions.ApplyBonusCount;
 import net.minecraft.world.level.storage.loot.functions.SetItemCountFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemBlockStatePropertyCondition;
+import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import net.minecraft.world.level.storage.loot.providers.number.UniformGenerator;
 
 import java.util.Set;
@@ -42,6 +45,8 @@ public class MJLootTableProvider extends BlockLootSubProvider {
 
         add(MJBlocks.TANTALUM_ORE.get(), block -> createOreDrop(MJBlocks.TANTALUM_ORE.get(), MJItems.RAW_TANTALUM.get()));
         add(MJBlocks.DEEPSLATE_TANTALUM_ORE.get(), block -> createOreDrop(MJBlocks.DEEPSLATE_TANTALUM_ORE.get(), MJItems.RAW_TANTALUM.get()));
+
+        add(MJBlocks.PLANET_SIMULATOR_PART.get(), block -> createPartDrop(MJBlocks.PLANET_SIMULATOR_PART.get()));
     }
 
     protected LootTable.Builder createOreDrop(Block block, Item item) {
@@ -57,12 +62,30 @@ public class MJLootTableProvider extends BlockLootSubProvider {
         );
     }
 
+    protected LootTable.Builder createPartDrop(Block block){
+        return LootTable.lootTable().withPool(this.applyExplosionCondition(
+                block, LootPool.lootPool().setRolls(ConstantValue.exactly(1.0F))
+                        .add(LootItem.lootTableItem(MJBlocks.PLANET_SIMULATOR_CASING.get())
+                                .when(LootItemBlockStatePropertyCondition.hasBlockStateProperties(MJBlocks.PLANET_SIMULATOR_PART.get())
+                                        .setProperties(net.minecraft.advancements.critereon.StatePropertiesPredicate.Builder.properties()
+                                                .hasProperty(PlanetSimulatorPartBlock.VARIANT, PlanetSimulatorPartBlock.Variant.CASING))))
+                        .add(LootItem.lootTableItem(MJBlocks.PLANET_SIMULATOR_CASING.get())
+                                .when(LootItemBlockStatePropertyCondition.hasBlockStateProperties(MJBlocks.PLANET_SIMULATOR_PART.get())
+                                        .setProperties(net.minecraft.advancements.critereon.StatePropertiesPredicate.Builder.properties()
+                                                .hasProperty(PlanetSimulatorPartBlock.VARIANT, PlanetSimulatorPartBlock.Variant.PROJECTOR))))
+                        .add(LootItem.lootTableItem(MJBlocks.PLANET_SIMULATOR_FRAME.get())
+                                .when(LootItemBlockStatePropertyCondition.hasBlockStateProperties(MJBlocks.PLANET_SIMULATOR_PART.get())
+                                        .setProperties(net.minecraft.advancements.critereon.StatePropertiesPredicate.Builder.properties()
+                                                .hasProperty(PlanetSimulatorPartBlock.VARIANT, PlanetSimulatorPartBlock.Variant.FRAME))))
+        ));
+    }
+
     @Override
     protected Iterable<Block> getKnownBlocks() {
         return MJBlocks.BLOCKS.getEntries().stream()
                 .map(entry -> (Block) entry.get())
                 .filter(block -> !(block instanceof CompressorGhostBlock))
-                .filter(block -> !(block instanceof PlanetSimulatorPartBlock))
+                //.filter(block -> !(block instanceof PlanetSimulatorPartBlock))
                 .toList();
     }
 }

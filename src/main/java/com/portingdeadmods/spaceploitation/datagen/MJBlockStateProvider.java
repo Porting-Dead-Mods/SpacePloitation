@@ -1,6 +1,7 @@
 package com.portingdeadmods.spaceploitation.datagen;
 
 import com.portingdeadmods.spaceploitation.Spaceploitation;
+import com.portingdeadmods.spaceploitation.content.block.CompressorBlock;
 import com.portingdeadmods.spaceploitation.content.block.PlanetSimulatorPartBlock;
 import com.portingdeadmods.spaceploitation.registries.MJBlocks;
 import com.portingdeadmods.portingdeadlibs.api.datagen.ModelBuilder;

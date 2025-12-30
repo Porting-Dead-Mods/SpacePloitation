@@ -17,6 +17,7 @@ import com.portingdeadmods.portingdeadlibs.api.utils.PDLDeferredRegisterBlocks;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 
 import java.util.Set;
